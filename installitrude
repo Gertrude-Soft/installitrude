@@ -1,0 +1,113 @@
+#!/bin/bash
+
+ITAL="\e[3m"
+
+GREEN="\e[32m"
+YELLOW="\e[33m"
+RED="\e[31m"
+NONE="\e[0m"
+
+clear
+echo -e $GREEN"==== Installitrude ====\n"$NONE
+echo -e $YELLOW"\nChecking for updates...\n"$NONE
+
+if [[ "$1" != "devmode-on" ]]; then
+    git --quiet pull origin main
+    echo -e $GREEN"Up-to-date!"$NONE
+else
+    echo -e $RED"Dev Mode is on, skipping updates\n"$NONE
+    sleep 1
+fi
+clear
+
+tools=()
+desc=()
+deps=()
+paths=()
+PART=0
+while read line; do
+    if [[ "$line" != "" ]] && [ $PART == 0 ]; then
+        tools+=( "$line" )
+    else if [[ "$line" = "" ]]; then
+        ((PART++))
+    else if [[ "$line" != "" ]] && [ $PART == 1 ]; then
+        desc+=( "$line" )
+    else if [[ "$line" != "" ]] && [ $PART == 2 ]; then
+        deps+=( "$line" )
+    else if [[ "$line" != "" ]] && [ $PART == 3 ]; then
+        paths+=( "$line" )
+    fi
+    fi
+    fi
+    fi
+    fi
+done < .gertrude_list
+
+# # dont ask. just dont.
+# echo ${paths[${deps[1]:0:1}]}
+
+install () {
+    local tool=$1
+    local end=${#deps[$tool]}-4
+
+    echo -e $GREEN"==== Installitrude ====\n"$NONE
+    if [ ! -d ${paths[${deps[$tool]:0:1}]} ] && [[ "${deps[$tool]}" != "nil" ]]; then
+        echo -e $RED"This tool requires ${deps[$tool]:4:$end} to be installed."$NONE
+        sleep 1
+        return 84
+    fi
+    if [ -d ${paths[$tool]} ]; then
+        echo -e $GREEN"This tool is already installed, enjoy!"$NONE
+        sleep 1
+        clear
+        main_menu
+        return 0
+    fi
+    if [ "$EUID" -ne 0 ]; then
+        echo -e $RED"Installitrude must be run as root"$NONE
+        exit 84
+    fi
+    echo -e $YELLOW"Installing ${tools[$tool]}...\n"$NONE
+    git clone https://github.com/${tools[$tool]} ${paths[$tool]} 
+    echo -e $GREEN"Good Plant"$NONE
+}
+
+main_menu () {
+    local nb=${#tools[@]}
+    local exit
+    local tool
+
+    echo -e $GREEN"==== Installitrude ====\n"$NONE
+    echo -e "What components would you like to install?\n"
+    for (( i = 0; i < nb; i++ )) do
+        if [ ! -d ${paths[${deps[i]:0:1}]} ] && [[ "${deps[$i]}" != "nil" ]]; then
+            echo -e $RED$ITAL
+        fi
+        if [ -d ${paths[$i]} ]; then
+            echo -e $GREEN
+        fi
+        echo -e $i" - ${desc[$i]}"$NONE
+    done
+    echo -e "\n$YELLOW"
+    read -N 1 -p "Enter a number within the range or 'q' to exit: " tool
+    echo -e $NONE
+    if [[ $tool = "q" ]]; then
+        exit 0
+    fi
+    if [[ $tool < "0" ]] || [ $tool -ge $nb ]; then
+        echo -e $RED"Invalid input."$NONE
+        sleep 1
+        clear
+        main_menu
+        return 0
+    fi
+    clear
+    install $tool
+    exit=$?
+    if [ $exit == 84 ]; then
+        clear
+        main_menu
+    fi
+}
+
+main_menu
