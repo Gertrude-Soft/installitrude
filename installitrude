@@ -107,19 +107,20 @@ main_menu () {
     if [[ $tool = "q" ]]; then
         exit 0
     fi
-    if [[ $tool < "0" ]] || [ $tool -ge $nb ]; then
+    if [[ $tool -ge "0" ]] && [ $tool -lt $nb ]; then
+        clear
+        install $tool
+        exit=$?
+        if [ $exit == 84 ]; then
+            clear
+            main_menu
+        fi
+    else
         echo -e $RED"Invalid input."$NONE
         sleep 1
         clear
         main_menu
         return 0
-    fi
-    clear
-    install $tool
-    exit=$?
-    if [ $exit == 84 ]; then
-        clear
-        main_menu
     fi
 }
 
