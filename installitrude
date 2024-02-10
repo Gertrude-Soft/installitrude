@@ -24,6 +24,7 @@ tools=()
 desc=()
 deps=()
 paths=()
+post_cmd=()
 PART=0
 while read line; do
     if [[ "$line" != "" ]] && [ $PART == 0 ]; then
@@ -36,6 +37,9 @@ while read line; do
         deps+=( "$line" )
     else if [[ "$line" != "" ]] && [ $PART == 3 ]; then
         paths+=( "$line" )
+    else if [[ "$line" != "" ]] && [ $PART == 4 ]; then
+        post_cmd+=( "$line" )
+    fi
     fi
     fi
     fi
@@ -69,6 +73,10 @@ install () {
     fi
     echo -e $YELLOW"Installing ${tools[$tool]}...\n"$NONE
     git clone https://github.com/${tools[$tool]} ${paths[$tool]} 
+    echo -e "\n"
+    if [[ ${post_cmd[$tool]} != "nil" ]]; then
+        ${post_cmd[$tool]}
+    fi
     echo -e $GREEN"Good Plant"$NONE
 }
 
