@@ -71,13 +71,18 @@ install () {
         echo -e $RED"Installitrude must be run as root"$NONE
         exit 84
     fi
-    echo -e $YELLOW"Installing ${tools[$tool]}...\n"$NONE
-    git clone https://github.com/${tools[$tool]} ${paths[$tool]} 
-    echo -e "\n"
+    if [[ ${tools[$tool]} != "nil" ]]; then
+        echo -e $YELLOW"Installing ${tools[$tool]}...\n"$NONE
+        git clone https://github.com/${tools[$tool]} ${paths[$tool]} 
+        echo -e "\n"
+    fi
     if [[ ${post_cmd[$tool]} != "nil" ]]; then
         ${post_cmd[$tool]}
     fi
     echo -e $GREEN"Good Plant"$NONE
+    sleep 1
+    clear
+    main_menu
 }
 
 main_menu () {
@@ -102,19 +107,20 @@ main_menu () {
     if [[ $tool = "q" ]]; then
         exit 0
     fi
-    if [[ $tool < "0" ]] || [ $tool -ge $nb ]; then
+    if [[ $tool -ge "0" ]] && [ $tool -lt $nb ]; then
+        clear
+        install $tool
+        exit=$?
+        if [ $exit == 84 ]; then
+            clear
+            main_menu
+        fi
+    else
         echo -e $RED"Invalid input."$NONE
         sleep 1
         clear
         main_menu
         return 0
-    fi
-    clear
-    install $tool
-    exit=$?
-    if [ $exit == 84 ]; then
-        clear
-        main_menu
     fi
 }
 
