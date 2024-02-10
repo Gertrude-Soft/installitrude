@@ -10,5 +10,5 @@ nil
 /opt/gertrude-cli/
 /opt/gertrude-cli/addons/intellitrude/
 
-make -C /opt/gertrude-cli/
+./ger_deps && make -C /opt/gertrude-cli/
 nil

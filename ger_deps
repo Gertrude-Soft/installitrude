@@ -1,0 +1,29 @@
+#!/bin/bash
+
+set -e
+
+cd
+sudo rm -rf /tmp/installitrude/
+mkdir /tmp/installitrude
+cd /tmp/installitrude
+clear
+
+# INSTALLATION OF LUAROCKS
+wget https://luarocks.org/releases/luarocks-3.9.2.tar.gz
+tar zxpf luarocks-3.9.2.tar.gz
+cd luarocks-3.9.2
+./configure && make && sudo make install
+echo -e "\n\e[32mLuarocks Installed successfully\e[0m\n"
+
+# INSTALLATION OF LUAFILESYSTEM
+sudo luarocks install luafilesystem
+echo "require \"lfs\"" | lua
+echo -e "\n\e[32mLuaFileSystem Installed successfully\e[0m\n"
+sleep 0.5
+clear
+
+# REMOVING INSTALLATION DIR
+echo "Removing installation directory..."
+cd
+sudo rm -rf /tmp/installitrude/
+echo -e "\n\e[32mDependencies Installation complete!\e[0m\n"
