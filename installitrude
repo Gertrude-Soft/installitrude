@@ -29,25 +29,27 @@ check_pull () {
     return 84
 }
 
-if [[ "$1" != "devmode-on" ]]; then
-    git pull --progress origin main &> /tmp/installitrude/pull
-    check_pull
-    pull_status=$?
-    if [ $pull_status -eq 1 ]; then
-        echo -e $GREEN"Up-to-date!"$NONE
-    else if [ $pull_status -eq 84 ]; then
-        echo -e $RED"Update failed, you might not experience the latest gertrude tools!"$NONE
-        sleep 1
+update () {
+    if [[ "$1" != "devmode-on" ]]; then
+        git pull --progress origin main &> /tmp/installitrude/pull
+        check_pull
+        pull_status=$?
+        if [ $pull_status -eq 1 ]; then
+            echo -e $GREEN"Up-to-date!"$NONE
+        else if [ $pull_status -eq 84 ]; then
+            echo -e $RED"Update failed, you might not experience the latest gertrude tools!"$NONE
+            sleep 1
+        else
+            echo -e $GREEN"The latest version is already installed!"$NONE
+            sleep 1
+        fi
+        fi
     else
-        echo -e $GREEN"The latest version is already installed!"$NONE
+        echo -e $RED"Dev Mode is on, skipping updates\n"$NONE
         sleep 1
     fi
-    fi
-else
-    echo -e $RED"Dev Mode is on, skipping updates\n"$NONE
-    sleep 1
-fi
-clear
+    clear
+}
 
 tools=()
 desc=()
@@ -154,5 +156,6 @@ main_menu () {
     fi
 }
 
+update '$@'
 main_menu
 rm -rf /tmp/installitrude
