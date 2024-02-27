@@ -105,7 +105,7 @@ install () {
     fi
     if [[ ${tools[$tool]} != "nil" ]]; then
         echo -e $YELLOW"Installing ${tools[$tool]}...\n"$NONE
-        git clone https://github.com/${tools[$tool]} ${paths[$tool]}
+        git clone https://github.com/${tools[$tool]}.git ${paths[$tool]}
         echo -e "\n"
     fi
     if [[ ${post_cmd[$tool]} != "nil" ]]; then
@@ -117,6 +117,36 @@ install () {
     main_menu
 }
 
+c_tool_update () {
+    local file_date=$(date -r $1 +%Y%m%d)
+    local curl_date
+
+    $(curl https://api.github.com/repos/${tools[$2]}/commits/main \
+    --no-progress-meter 2>&1 | grep '"date"' \
+    | tail -n 1 > /tmp/installitrude/tool_updt)
+    curl_date=$(cat /tmp/installitrude/tool_updt)
+    curl_date=${curl_date:15:10}
+    if [[ ${curl_date:9:1} = "T" ]]; then
+        curl_date=${curl_date:0:9}
+    fi
+    if [[ $file_date -le $(date -d $curl_date +%Y%m%d) ]]; then
+        echo -e $YELLOW
+    fi
+}
+
+disp_tools () {
+    for (( i = 0; i < nb; i++ )) do
+        if [ ! -d ${paths[${deps[i]:0:1}]} ] && [[ "${deps[$i]}" != "nil" ]]; then
+            echo -e $RED$ITAL
+        fi
+        if [ -d ${paths[$i]} ]; then
+            echo -e $GREEN
+            c_tool_update ${paths[$i]} $i
+        fi
+        echo -e $i" - ${desc[$i]}"$NONE
+    done
+}
+
 main_menu () {
     local nb=${#tools[@]}
     local exit
@@ -124,15 +154,7 @@ main_menu () {
 
     echo -e $GREEN"==== Installitrude ====\n"$NONE
     echo -e "What components would you like to install?\n"
-    for (( i = 0; i < nb; i++ )) do
-        if [ ! -d ${paths[${deps[i]:0:1}]} ] && [[ "${deps[$i]}" != "nil" ]]; then
-            echo -e $RED$ITAL
-        fi
-        if [ -d ${paths[$i]} ]; then
-            echo -e $GREEN
-        fi
-        echo -e $i" - ${desc[$i]}"$NONE
-    done
+    disp_tools
     echo -e "\n$YELLOW"
     read -N 1 -p "Enter a number within the range or 'q' to exit: " tool
     echo -e $NONE
