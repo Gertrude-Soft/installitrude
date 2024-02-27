@@ -12,3 +12,6 @@ nil
 
 ./gertrude-cli/ger_deps && make -C /opt/gertrude-cli/
 nil
+
+include/ger_conf.h
+nil

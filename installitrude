@@ -30,8 +30,10 @@ check_pull () {
 }
 
 update () {
+    local user=$(logname)
+
     if [[ "$1" != "devmode-on" ]]; then
-        git pull --progress origin main &> /tmp/installitrude/pull
+        sudo -u $user git pull --progress origin main &> /tmp/installitrude/pull
         check_pull
         pull_status=$?
         if [ $pull_status -eq 1 ]; then
@@ -56,6 +58,7 @@ desc=()
 deps=()
 paths=()
 post_cmd=()
+config=()
 PART=0
 while read line; do
     if [[ "$line" != "" ]] && [ $PART == 0 ]; then
@@ -70,6 +73,9 @@ while read line; do
         paths+=( "$line" )
     else if [[ "$line" != "" ]] && [ $PART == 4 ]; then
         post_cmd+=( "$line" )
+    else if [[ "$line" != "" ]] && [ $PART == 5 ]; then
+        config+=( "$line" )
+    fi
     fi
     fi
     fi
@@ -86,17 +92,21 @@ install () {
     local end=${#deps[$tool]}-4
 
     echo -e $GREEN"==== Installitrude ====\n"$NONE
+    if [ -d ${paths[$tool]} ]; then
+        echo -e $RED"Warning: This will perform a clean install, do you really wish to continue? (y/n)"
+        read -N 1 confirm
+        if [[ $confirm == "n" ]]; then
+            echo -e "\nAborted successfully!"$NONE
+            sleep 1
+            clear
+            main_menu
+            return 1
+        fi
+    fi
     if [ ! -d ${paths[${deps[$tool]:0:1}]} ] && [[ "${deps[$tool]}" != "nil" ]]; then
         echo -e $RED"This tool requires ${deps[$tool]:4:$end} to be installed."$NONE
         sleep 1
         return 84
-    fi
-    if [ -d ${paths[$tool]} ]; then
-        echo -e $GREEN"This tool is already installed, enjoy!"$NONE
-        sleep 1
-        clear
-        main_menu
-        return 0
     fi
     if [ "$EUID" -ne 0 ]; then
         echo -e $RED"Installitrude must be run as root"$NONE
@@ -130,21 +140,64 @@ c_tool_update () {
         curl_date=${curl_date:0:9}
     fi
     if [[ $file_date -le $(date -d $curl_date +%Y%m%d) ]]; then
-        echo -e $YELLOW
+        echo -en $YELLOW
+        return 1
     fi
+    return 0
 }
 
 disp_tools () {
-    for (( i = 0; i < nb; i++ )) do
+    for i in $(seq 0 $(($1 - 1))); do
         if [ ! -d ${paths[${deps[i]:0:1}]} ] && [[ "${deps[$i]}" != "nil" ]]; then
-            echo -e $RED$ITAL
+            echo -en $RED$ITAL
         fi
         if [ -d ${paths[$i]} ]; then
-            echo -e $GREEN
+            echo -en $GREEN
             c_tool_update ${paths[$i]} $i
         fi
         echo -e $i" - ${desc[$i]}"$NONE
     done
+}
+
+update_tool () {
+    if [ ${config[$1]} != "nil" ]; then
+        cp "${paths[$1]}${config[$1]}" "/tmp/installitrude/saved_config"
+    fi
+    if [ "$EUID" -ne 0 ]; then
+        echo -e $RED"Installitrude must be run as root"$NONE
+        rm -rf /tmp/installitrude
+        exit 84
+    fi
+    if [[ ${tools[$1]} != "nil" ]]; then
+        echo -e $YELLOW"Installing ${tools[$1]}...\n"$NONE
+        sudo rm -rf /opt/gertrude-cli
+        git clone https://github.com/${tools[$1]}.git ${paths[$1]}
+        echo -e "\n"
+    fi
+    if [[ ${post_cmd[$1]} != "nil" ]]; then
+        ${post_cmd[$1]}
+    fi
+    echo -e $GREEN"Updated "${tools[$1]}$NONE
+    if [ ${config[$1]} != "nil" ]; then
+        cp /tmp/installitrude/saved_config ${paths[$1]}${config[$1]}
+        sudo rm /tmp/installitrude/saved_config
+    fi
+}
+
+update_all () {
+    echo -e $GREEN"==== Installitrude ====\n"$NONE
+    for i in $(seq 0 $(($1 - 1))); do
+        if [ -d ${paths[$i]} ]; then
+            c_tool_update ${paths[$i]} $i
+            if [ $? = 1 ]; then
+                update_tool $i
+            fi
+        fi
+    done
+    echo -e $GREEN"Everything is up to date!"
+    sleep 1;
+    clear
+    main_menu
 }
 
 main_menu () {
@@ -154,12 +207,17 @@ main_menu () {
 
     echo -e $GREEN"==== Installitrude ====\n"$NONE
     echo -e "What components would you like to install?\n"
-    disp_tools
-    echo -e "\n$YELLOW"
-    read -N 1 -p "Enter a number within the range or 'q' to exit: " tool
-    echo -e $NONE
+    disp_tools $nb
+    echo -en "\n$YELLOW"
+    read -N 1 -p "[0-$((nb - 1))], [q]uit, [U]pdate All (WIP): " tool
+    echo -en $NONE
     if [[ $tool = "q" ]]; then
         exit 0
+    fi
+    if [[ $tool = "U" ]]; then
+        clear
+        update_all $nb
+        return
     fi
     if [[ $tool -ge "0" ]] && [ $tool -lt $nb ]; then
         clear
@@ -168,6 +226,7 @@ main_menu () {
         if [ $exit == 84 ]; then
             clear
             main_menu
+            return
         fi
     else
         echo -e $RED"Invalid input."$NONE

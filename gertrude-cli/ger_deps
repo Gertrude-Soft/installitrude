@@ -4,9 +4,9 @@ set -e
 
 echo -e "\nCreating installation directory\n"
 cd
-sudo rm -rf /tmp/installitrude/
-mkdir /tmp/installitrude
-cd /tmp/installitrude
+sudo rm -rf /tmp/installitrude/gertrude-cli/
+mkdir /tmp/installitrude/gertrude-cli
+cd /tmp/installitrude/gertrude-cli
 
 # INSTALLATION OF LUAROCKS
 LR=$(which luarocks)
@@ -42,7 +42,7 @@ fi
 # REMOVING INSTALLATION DIR
 echo "Removing installation directory..."
 cd
-sudo rm -rf /tmp/installitrude/
+sudo rm -rf /tmp/installitrude/gertrude-cli/
 echo -e "\n\e[32mDependencies Installation complete!\e[0m\n"
 
 read -N 1 -p "Press any key to continue" placeholder
