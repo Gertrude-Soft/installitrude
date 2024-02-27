@@ -7,13 +7,42 @@ YELLOW="\e[33m"
 RED="\e[31m"
 NONE="\e[0m"
 
+mkdir /tmp/installitrude
+
 clear
 echo -e $GREEN"==== Installitrude ====\n"$NONE
 echo -e $YELLOW"\nChecking for updates...\n"$NONE
 
+check_pull () {
+    local ex_st
+
+    $(cat /tmp/installitrude/pull | grep "Already up to date." > /dev/null)
+    ex_st=$?
+    if [ $ex_st -eq 0 ]; then
+        return 0
+    fi
+    $(cat /tmp/installitrude/pull | grep "files changed" > /dev/null)
+    ex_st=$?
+    if [ $ex_st -eq 0 ]; then
+        return 1
+    fi
+    return 84
+}
+
 if [[ "$1" != "devmode-on" ]]; then
-    git --quiet pull origin main
-    echo -e $GREEN"Up-to-date!"$NONE
+    git pull --progress origin main &> /tmp/installitrude/pull
+    check_pull
+    pull_status=$?
+    if [ $pull_status -eq 1 ]; then
+        echo -e $GREEN"Up-to-date!"$NONE
+    else if [ $pull_status -eq 84 ]; then
+        echo -e $RED"Update failed, you might not experience the latest gertrude tools!"$NONE
+        sleep 1
+    else
+        echo -e $GREEN"The latest version is already installed!"$NONE
+        sleep 1
+    fi
+    fi
 else
     echo -e $RED"Dev Mode is on, skipping updates\n"$NONE
     sleep 1
@@ -69,11 +98,12 @@ install () {
     fi
     if [ "$EUID" -ne 0 ]; then
         echo -e $RED"Installitrude must be run as root"$NONE
+        rm -rf /tmp/installitrude
         exit 84
     fi
     if [[ ${tools[$tool]} != "nil" ]]; then
         echo -e $YELLOW"Installing ${tools[$tool]}...\n"$NONE
-        git clone https://github.com/${tools[$tool]} ${paths[$tool]} 
+        git clone https://github.com/${tools[$tool]} ${paths[$tool]}
         echo -e "\n"
     fi
     if [[ ${post_cmd[$tool]} != "nil" ]]; then
@@ -125,3 +155,4 @@ main_menu () {
 }
 
 main_menu
+rm -rf /tmp/installitrude
