@@ -212,6 +212,7 @@ main_menu () {
     read -N 1 -p "[0-$((nb - 1))], [q]uit, [U]pdate All (WIP): " tool
     echo -en $NONE
     if [[ $tool = "q" ]]; then
+        sudo rm -rf /tmp/installitrude
         exit 0
     fi
     if [[ $tool = "U" ]]; then
@@ -229,7 +230,7 @@ main_menu () {
             return
         fi
     else
-        echo -e $RED"Invalid input."$NONE
+        echo -e $RED"\nInvalid input."$NONE
         sleep 1
         clear
         main_menu
