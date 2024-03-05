@@ -1,5 +1,5 @@
-AshDev05/gertrude-cli.git
-lg-epitech/Intellitrude.git
+AshDev05/gertrude-cli
+lg-epitech/Intellitrude
 
 Gertrude-CLI - The Original Makefile Creation Tool
 Intellitrude - An AI addon to Gertrude-CLI (requires Gertrude-CLI)
@@ -11,4 +11,7 @@ nil
 /opt/gertrude-cli/addons/intellitrude/
 
 ./gertrude-cli/ger_deps && make -C /opt/gertrude-cli/
+nil
+
+include/ger_conf.h
 nil
