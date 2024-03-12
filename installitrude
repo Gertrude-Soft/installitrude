@@ -1,6 +1,7 @@
 #!/bin/bash
 
 ITAL="\e[3m"
+BOLD="\e[1m"
 
 GREEN="\e[32m"
 YELLOW="\e[33m"
@@ -33,13 +34,18 @@ update () {
     local user=$(logname)
 
     if [[ "$1" != "devmode-on" ]]; then
+        if [ "$EUID" -ne 0 ]; then
+            echo -e $RED$BOLD"Installitrude must be run as root"$NONE
+            rm -rf /tmp/installitrude
+            exit 84
+        fi
         sudo -u $user git pull --progress origin main &> /tmp/installitrude/pull
         check_pull
         pull_status=$?
         if [ $pull_status -eq 1 ]; then
             echo -e $GREEN"Up-to-date!"$NONE
         else if [ $pull_status -eq 84 ]; then
-            echo -e $RED"Update failed, you might not experience the latest gertrude tools!"$NONE
+            echo -e $RED$BOLD"Update failed, you might not experience the latest gertrude tools!"$NONE
             sleep 1
         else
             echo -e $GREEN"The latest version is already installed!"$NONE
@@ -47,7 +53,8 @@ update () {
         fi
         fi
     else
-        echo -e $RED"Dev Mode is on, skipping updates\n"$NONE
+        echo -e $RED$BOLD"Dev Mode is on, skipping updates\n"$NONE
+        echo -e $RED$BOLD"Bypassing root requirements..."$NONE
         sleep 1
     fi
     clear
@@ -93,7 +100,7 @@ install () {
 
     echo -e $GREEN"==== Installitrude ====\n"$NONE
     if [ -d ${paths[$tool]} ]; then
-        echo -e $RED"Warning: This will perform a clean install, do you really wish to continue? (y/n)"
+        echo -e $BOLD$RED"Warning: This will perform a clean install, do you really wish to continue? (y/n)"
         read -N 1 confirm
         if [[ $confirm == "n" ]]; then
             echo -e "\nAborted successfully!"$NONE
@@ -104,12 +111,12 @@ install () {
         fi
     fi
     if [ ! -d ${paths[${deps[$tool]:0:1}]} ] && [[ "${deps[$tool]}" != "nil" ]]; then
-        echo -e $RED"This tool requires ${deps[$tool]:4:$end} to be installed."$NONE
+        echo -e $BOLD$RED"This tool requires ${deps[$tool]:4:$end} to be installed."$NONE
         sleep 1
         return 84
     fi
     if [ "$EUID" -ne 0 ]; then
-        echo -e $RED"Installitrude must be run as root"$NONE
+        echo -e $BOLD$RED"Installitrude must be run as root"$NONE
         rm -rf /tmp/installitrude
         exit 84
     fi
@@ -128,18 +135,30 @@ install () {
 }
 
 c_tool_update () {
-    local file_date=$(date -r $1 +%Y%m%d)
+    local file_date=$(date -r "$1" +%Y%m%d)
     local curl_date
+    local rate_limit
 
     $(curl https://api.github.com/repos/${tools[$2]}/commits/main \
-    --no-progress-meter 2>&1 | grep '"date"' \
-    | tail -n 1 > /tmp/installitrude/tool_updt)
-    curl_date=$(cat /tmp/installitrude/tool_updt)
+    --no-progress-meter &> /tmp/installitrude/tool_updt)
+    curl_date=$(cat /tmp/installitrude/tool_updt | grep '"date"' \
+        | tail -n 1)
+    rate_limit=$(cat /tmp/installitrude/tool_updt | grep 'rate limit' \
+        | tail -n 1)
+    if [[ "$curl_date" = "" ]]; then
+        if [[ "$rate_limit" != "" ]]; then
+            echo -e $RED$BOLD"\rCould not fetch tool updates (Github REST API rate limit exceeded).\n"$NONE
+        else
+            echo -e $BOLD$RED"\rCould not fetch tool updates (unknown error)."
+            echo -e "Make sure you are connected to the internet and have git installed.\n"$NONE
+        fi
+        return 0;
+    fi
     curl_date=${curl_date:15:10}
     if [[ ${curl_date:9:1} = "T" ]]; then
         curl_date=${curl_date:0:9}
     fi
-    if [[ $file_date -le $(date -d $curl_date +%Y%m%d) ]]; then
+    if [[ $file_date -le $(date -d "$curl_date" +%Y%m%d) ]]; then
         echo -en $YELLOW
         return 1
     fi
@@ -147,16 +166,20 @@ c_tool_update () {
 }
 
 disp_tools () {
+    local buffer
+
     for i in $(seq 0 $(($1 - 1))); do
         if [ ! -d ${paths[${deps[i]:0:1}]} ] && [[ "${deps[$i]}" != "nil" ]]; then
-            echo -en $RED$ITAL
+            buffer=$buffer$RED$ITAL
         fi
         if [ -d ${paths[$i]} ]; then
-            echo -en $GREEN
+            buffer=$buffer$GREEN
             c_tool_update ${paths[$i]} $i
         fi
-        echo -e $i" - ${desc[$i]}"$NONE
+        buffer=$buffer$i" - ${desc[$i]}\n"$NONE
     done
+    echo -e $BOLD"\r== What components would you like to install? ==\n"$NONE
+    echo -e $buffer
 }
 
 update_tool () {
@@ -164,7 +187,7 @@ update_tool () {
         cp "${paths[$1]}${config[$1]}" "/tmp/installitrude/saved_config"
     fi
     if [ "$EUID" -ne 0 ]; then
-        echo -e $RED"Installitrude must be run as root"$NONE
+        echo -e $BOLD$RED"Installitrude must be run as root"$NONE
         rm -rf /tmp/installitrude
         exit 84
     fi
@@ -184,6 +207,51 @@ update_tool () {
     fi
 }
 
+rem_input () {
+    local tool=$1
+    local nb=$2
+
+    if [[ $tool = "q" ]]; then
+        sudo rm -rf /tmp/installitrude
+        exit 0
+    fi
+    if [[ $tool = "b" ]]; then
+        clear
+        main_menu
+        return
+    fi
+    if [[ $tool -ge "0" ]] && [ $tool -lt $nb ]; then
+        clear
+        if [[ -d ${paths[$tool]} ]]; then
+            uninstall $tool
+        fi
+    else
+        echo -e $RED"\nInvalid input."$NONE
+        sleep 1
+        clear
+        rem_menu "$3"
+        return -1
+    fi
+}
+
+rem_menu () {
+    local nb=$1
+    local tool
+    local count=0
+
+    echo -e $GREEN"==== Installitrude ====\n"$NONE
+    for i in $(seq 0 $((nb - 1))); do
+        if [ -d ${paths[$i]} ]; then
+            echo -e $i" - ${desc[$i]}"$NONE
+            ((count++))
+        fi
+    done
+    echo -en "\n$YELLOW"
+    read -N 1 -p "[0-$((count - 1))], [b]ack, [q]uit: " tool
+    echo -en "$NONE"
+    rem_input "$tool" "$count" "$nb"
+}
+
 update_all () {
     echo -e $GREEN"==== Installitrude ====\n"$NONE
     for i in $(seq 0 $(($1 - 1))); do
@@ -200,17 +268,10 @@ update_all () {
     main_menu
 }
 
-main_menu () {
-    local nb=${#tools[@]}
-    local exit
-    local tool
+main_input () {
+    local tool="$1"
+    local nb="$2"
 
-    echo -e $GREEN"==== Installitrude ====\n"$NONE
-    echo -e "What components would you like to install?\n"
-    disp_tools $nb
-    echo -en "\n$YELLOW"
-    read -N 1 -p "[0-$((nb - 1))], [q]uit, [U]pdate All (WIP): " tool
-    echo -en $NONE
     if [[ $tool = "q" ]]; then
         sudo rm -rf /tmp/installitrude
         exit 0
@@ -220,7 +281,12 @@ main_menu () {
         update_all $nb
         return
     fi
-    if [[ $tool -ge "0" ]] && [ $tool -lt $nb ]; then
+    if [[ $tool = "r" ]]; then
+        clear
+        rem_menu $nb
+        return
+    fi
+    if [[ "$tool" -ge "0" ]] && [[ "$tool" -lt "$nb" ]]; then
         clear
         install $tool
         exit=$?
@@ -238,6 +304,20 @@ main_menu () {
     fi
 }
 
-update '$@'
+main_menu () {
+    local nb=${#tools[@]}
+    local exit
+    local tool
+
+    echo -e $GREEN"==== Installitrude ====\n"$NONE
+    echo -en $YELLOW"Checking for updates..."$NONE
+    disp_tools $nb
+    echo -en "\n$YELLOW"
+    read -N 1 -p "[0-$((nb - 1))], [q]uit, [U]pdate All, [r]emove One: " tool
+    echo -en $NONE
+    main_input "$tool" "$nb"
+}
+
+update "$@"
 main_menu
 rm -rf /tmp/installitrude
