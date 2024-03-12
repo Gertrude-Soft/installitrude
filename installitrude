@@ -1,4 +1,10 @@
 #!/bin/bash
+##
+## GERTRUDE PROJECT, 2024
+## installitrude
+## File description:
+## installitrude.sh
+##
 
 ITAL="\e[3m"
 BOLD="\e[1m"
@@ -319,5 +325,9 @@ main_menu () {
 }
 
 update "$@"
+if [[ "$1" == "-g" ]]; then
+    sudo ./.global_installation
+    exit 0
+fi
 main_menu
 rm -rf /tmp/installitrude
