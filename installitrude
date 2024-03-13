@@ -14,26 +14,51 @@ YELLOW="\e[33m"
 RED="\e[31m"
 NONE="\e[0m"
 
+if [ ! -d /opt/installitrude ]; then
+    echo -e $RED"Installitrude is not installed globally!\nRun ./global_installation."$NONE
+    exit 84
+fi
 mkdir /tmp/installitrude
 
 clear
 echo -e $GREEN"==== Installitrude ====\n"$NONE
 echo -e $YELLOW"\nChecking for updates...\n"$NONE
 
-check_pull () {
-    local ex_st
+c_installitrude_update () {
+    local file_date=$(date -r "/opt/installitrude/.gertrude_list" +%Y%m%d)
+    local curl_date
+    local rate_limit
 
-    $(cat /tmp/installitrude/pull | grep "Already up to date." > /dev/null)
-    ex_st=$?
-    if [ $ex_st -eq 0 ]; then
-        return 0
+    $(curl https://api.github.com/repos/AshDev05/installitrude/commits/main \
+    --no-progress-meter &> /tmp/installitrude/inst_updt)
+    curl_date=$(cat /tmp/installitrude/inst_updt | grep '"date"' \
+        | tail -n 1)
+    rate_limit=$(cat /tmp/installitrude/inst_updt | grep 'rate limit' \
+        | tail -n 1)
+    if [[ "$curl_date" = "" ]]; then
+        if [[ "$rate_limit" != "" ]]; then
+            echo -e $RED$BOLD"\rCould not fetch tool updates (Github REST API rate limit exceeded).\n"$NONE
+            echo "Press any key to continue..."
+            read
+            return 84
+        else
+            echo -e $BOLD$RED"\rCould not fetch tool updates (unknown error)."
+            echo -e "Make sure you are connected to the internet and have git installed.\n"$NONE
+            echo "Press any key to continue..."
+            read
+            return 84
+        fi
     fi
-    $(cat /tmp/installitrude/pull | grep "files changed" > /dev/null)
-    ex_st=$?
-    if [ $ex_st -eq 0 ]; then
+    curl_date=${curl_date:15:10}
+    if [[ ${curl_date:9:1} = "T" ]]; then
+        curl_date=${curl_date:0:9}
+    fi
+    echo $file_date" "$curl_date
+    read
+    if [[ $file_date -le $(date -d "$curl_date" +%Y%m%d) ]]; then
         return 1
     fi
-    return 84
+    return 0
 }
 
 update () {
@@ -45,11 +70,14 @@ update () {
             rm -rf /tmp/installitrude
             exit 84
         fi
-        sudo -u $user git pull --progress origin main &> /tmp/installitrude/pull
-        check_pull
+        c_installitrude_update
         pull_status=$?
         if [ $pull_status -eq 1 ]; then
-            echo -e $GREEN"Up-to-date!"$NONE
+            sudo rm -rf /opt/installitrude
+            sudo git clone https://github.com/AshDev05/installitrude /opt/installitrude
+            echo -e $GREEN"Up-to-date!\nPress any key to restart Installitrude!"$NONE
+            read
+            exec /usr/bin/installitrude "$@"
         else if [ $pull_status -eq 84 ]; then
             echo -e $RED$BOLD"Update failed, you might not experience the latest gertrude tools!"$NONE
             sleep 1
@@ -95,7 +123,7 @@ while read line; do
     fi
     fi
     fi
-done < .gertrude_list
+done < /opt/installitrude/.gertrude_list
 
 # # dont ask. just dont.
 # echo ${paths[${deps[1]:0:1}]}
@@ -325,9 +353,5 @@ main_menu () {
 }
 
 update "$@"
-if [[ "$1" == "-g" ]]; then
-    sudo ./.global_installation
-    exit 0
-fi
 main_menu
 rm -rf /tmp/installitrude
