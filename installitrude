@@ -53,8 +53,6 @@ c_installitrude_update () {
     if [[ ${curl_date:9:1} = "T" ]]; then
         curl_date=${curl_date:0:9}
     fi
-    echo $file_date" "$curl_date
-    read
     if [[ $file_date -le $(date -d "$curl_date" +%Y%m%d) ]]; then
         return 1
     fi
@@ -62,8 +60,6 @@ c_installitrude_update () {
 }
 
 update () {
-    local user=$(logname)
-
     if [[ "$1" != "devmode-on" ]]; then
         if [ "$EUID" -ne 0 ]; then
             echo -e $RED$BOLD"Installitrude must be run as root"$NONE
@@ -72,11 +68,12 @@ update () {
         fi
         c_installitrude_update
         pull_status=$?
-        if [ $pull_status -eq 1 ]; then
+        if [ $pull_status -eq 1 ] && [ ! -f /opt/installitrude/.uptodate ]; then
             sudo rm -rf /opt/installitrude
             sudo git clone https://github.com/AshDev05/installitrude /opt/installitrude
             echo -e $GREEN"Up-to-date!\nPress any key to restart Installitrude!"$NONE
             read
+            sudo touch /opt/installitrude/.uptodate
             exec /usr/bin/installitrude "$@"
         else if [ $pull_status -eq 84 ]; then
             echo -e $RED$BOLD"Update failed, you might not experience the latest gertrude tools!"$NONE
