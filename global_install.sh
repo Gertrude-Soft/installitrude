@@ -3,7 +3,7 @@
 ## GERTRUDE PROJECT, 2024
 ## installitrude
 ## File description:
-## global installation script
+## global install
 ##
 
 set -e
@@ -27,5 +27,5 @@ sudo chmod +x /usr/bin/installitrude
 if [ -f /usr/bin/installitrude ] && [ -d /opt/installitrude ]; then
     echo -e "\e[32m\e[1mInstallation Successful, you can now use installitrude globally!\e[0m"
 else
-    echo -e "\e[31m\e[1mnstallation Failed!\e[0m"
+    echo -e "\e[31m\e[1mInstallation Failed!\e[0m"
 fi

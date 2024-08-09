@@ -14,12 +14,46 @@ YELLOW="\e[33m"
 RED="\e[31m"
 NONE="\e[0m"
 
-if [ ! -d /opt/installitrude ]; then
-    echo -e $RED"Installitrude is not installed globally!\nRun ./global_installation."$NONE
+# OPTIONS
+FORCE_UPDT=0
+DEVMODE=0
+
+clear
+COUNTER=0
+while [[ $# -gt 0 ]]; do
+    key=$1
+    case $key in
+        devmode-on)
+            if [ $COUNTER -ne 0 ]; then
+                echo -e $YELLOW$BOLD"WARNING: "$NONE$YELLOW"Option devmode-on should be in first position."$NONE >&2
+            else
+                DEVMODE=1
+            fi
+            shift
+            ;;
+        --force-update|-F)
+            FORCE_UPDT=1
+            shift
+            ;;
+        *)
+            echo -e $RED$BOLD"Wrong option: $1!"$NONE >&2
+            shift
+            ;;
+    esac
+    ((COUNTER++))
+done
+
+if [ ! -d /opt/installitrude ] && [ "$DEVMODE" -ne 1 ]; then
+    echo -e $RED"Installitrude is not installed globally!\nRun make."$NONE >&2
     exit 84
+elif [ "$DEVMODE" -eq 1 ]; then
+    echo -e $YELLOW$BOLD"Warning:"$NONE$YELLOW"Installitrude might not work as expected - devmode is on!"$NONE
+    sleep 1
 fi
+
 mkdir /tmp/installitrude
 
+sleep 1
 clear
 echo -e $GREEN"==== Installitrude ====\n"$NONE
 echo -e $YELLOW"\nChecking for updates...\n"$NONE
@@ -29,7 +63,7 @@ c_installitrude_update () {
     local curl_date
     local rate_limit
 
-    $(curl https://api.github.com/repos/AshDev05/installitrude/commits/main \
+    $(curl https://api.github.com/repos/Gertrude-Soft/installitrude/commits/main \
     --no-progress-meter &> /tmp/installitrude/inst_updt)
     curl_date=$(cat /tmp/installitrude/inst_updt | grep '"date"' \
         | tail -n 1)
@@ -37,12 +71,12 @@ c_installitrude_update () {
         | tail -n 1)
     if [[ "$curl_date" = "" ]]; then
         if [[ "$rate_limit" != "" ]]; then
-            echo -e $RED$BOLD"\rCould not fetch tool updates (Github REST API rate limit exceeded).\n"$NONE
+            echo -e $RED$BOLD"\rCould not fetch tool updates (Github REST API rate limit exceeded).\n"$NONE >&2
             echo "Press any key to continue..."
             read
             return 84
         else
-            echo -e $BOLD$RED"\rCould not fetch tool updates (unknown error)."
+            echo -e $BOLD$RED"\rCould not fetch tool updates (unknown error)." >&2
             echo -e "Make sure you are connected to the internet and have git installed.\n"$NONE
             echo "Press any key to continue..."
             read
@@ -53,30 +87,33 @@ c_installitrude_update () {
     if [[ ${curl_date:9:1} = "T" ]]; then
         curl_date=${curl_date:0:9}
     fi
-    if [[ $file_date -le $(date -d "$curl_date" +%Y%m%d) ]]; then
+    if [[ $file_date -lt $(date -d "$curl_date" +%Y%m%d) ]]; then
         return 1
     fi
     return 0
 }
 
 update () {
-    if [[ "$1" != "devmode-on" ]]; then
+    if [ "$DEVMODE" -ne 1 ]; then
         if [ "$EUID" -ne 0 ]; then
-            echo -e $RED$BOLD"Installitrude must be run as root"$NONE
+            echo -e $RED$BOLD"Installitrude must be run as root"$NONE >&2
             rm -rf /tmp/installitrude
             exit 84
         fi
-        c_installitrude_update
-        pull_status=$?
-        if [ $pull_status -eq 1 ] && [ ! -f /opt/installitrude/.uptodate ]; then
+        if [ $FORCE_UPDT != 1 ]; then
+            c_installitrude_update
+            pull_status=$?
+        else
+            pull_status=1
+        fi
+        if [ $pull_status -eq 1 ]; then
             sudo rm -rf /opt/installitrude
             sudo git clone https://github.com/AshDev05/installitrude /opt/installitrude
             echo -e $GREEN"Up-to-date!\nPress any key to restart Installitrude!"$NONE
             read
-            sudo touch /opt/installitrude/.uptodate
             exec /usr/bin/installitrude "$@"
         else if [ $pull_status -eq 84 ]; then
-            echo -e $RED$BOLD"Update failed, you might not experience the latest gertrude tools!"$NONE
+            echo -e $RED$BOLD"Update failed, you might not experience the latest gertrude tools!"$NONE >&2
             sleep 1
         else
             echo -e $GREEN"The latest version is already installed!"$NONE
@@ -84,8 +121,8 @@ update () {
         fi
         fi
     else
-        echo -e $RED$BOLD"Dev Mode is on, skipping updates\n"$NONE
-        echo -e $RED$BOLD"Bypassing root requirements..."$NONE
+        echo -e $YELLOW$BOLD"Dev Mode is on, skipping updates\n"$NONE
+        echo -e $YELLOW$BOLD"Bypassing root requirements..."$NONE
         sleep 1
     fi
     clear
@@ -125,7 +162,7 @@ install () {
 
     echo -e $GREEN"==== Installitrude ====\n"$NONE
     if [ -d ${paths[$tool]} ]; then
-        echo -e $BOLD$RED"Warning: This will perform a clean install, do you really wish to continue? (y/n)"
+        echo -e $BOLD$YELLOW"Warning: This will perform a clean install, do you really wish to continue? (y/n)"
         read -N 1 confirm
         if [[ $confirm == "n" ]]; then
             echo -e "\nAborted successfully!"$NONE
@@ -140,8 +177,8 @@ install () {
         sleep 1
         return 84
     fi
-    if [ "$EUID" -ne 0 ]; then
-        echo -e $BOLD$RED"Installitrude must be run as root"$NONE
+    if [ "$EUID" -ne 0 ] && [ "$DEVMODE" -ne 1 ]; then
+        echo -e $BOLD$RED"Installitrude must be run as root"$NONE >&2
         rm -rf /tmp/installitrude
         exit 84
     fi
@@ -172,9 +209,9 @@ c_tool_update () {
         | tail -n 1)
     if [[ "$curl_date" = "" ]]; then
         if [[ "$rate_limit" != "" ]]; then
-            echo -e $RED$BOLD"\rCould not fetch tool updates (Github REST API rate limit exceeded).\n"$NONE
+            echo -e $RED$BOLD"\rCould not fetch tool updates (Github REST API rate limit exceeded).\n"$NONE >&2
         else
-            echo -e $BOLD$RED"\rCould not fetch tool updates (unknown error)."
+            echo -e $BOLD$RED"\rCould not fetch tool updates (unknown error)." >&2
             echo -e "Make sure you are connected to the internet and have git installed.\n"$NONE
         fi
         return 0;
@@ -203,7 +240,7 @@ disp_tools () {
         fi
         buffer=$buffer$i" - ${desc[$i]}\n"$NONE
     done
-    echo -e $BOLD"\r== What components would you like to install? ==\n"$NONE
+    echo -e $NONE$BOLD"\r== What components would you like to install? ==\n"$NONE
     echo -e $buffer
 }
 
@@ -212,7 +249,7 @@ update_tool () {
         cp "${paths[$1]}${config[$1]}" "/tmp/installitrude/saved_config"
     fi
     if [ "$EUID" -ne 0 ]; then
-        echo -e $BOLD$RED"Installitrude must be run as root"$NONE
+        echo -e $BOLD$RED"Installitrude must be run as root"$NONE >&2
         rm -rf /tmp/installitrude
         exit 84
     fi
@@ -321,7 +358,7 @@ main_input () {
             return
         fi
     else
-        echo -e $RED"\nInvalid input."$NONE
+        echo -e $RED"\nInvalid input."$NONE >&2
         sleep 1
         clear
         main_menu
