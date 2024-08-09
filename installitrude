@@ -101,24 +101,18 @@ PART=0
 while read line; do
     if [[ "$line" != "" ]] && [ $PART == 0 ]; then
         tools+=( "$line" )
-    else if [[ "$line" = "" ]]; then
+    elif [[ "$line" = "" ]]; then
         ((PART++))
-    else if [[ "$line" != "" ]] && [ $PART == 1 ]; then
+    elif [[ "$line" != "" ]] && [ $PART == 1 ]; then
         desc+=( "$line" )
-    else if [[ "$line" != "" ]] && [ $PART == 2 ]; then
+    elif [[ "$line" != "" ]] && [ $PART == 2 ]; then
         deps+=( "$line" )
-    else if [[ "$line" != "" ]] && [ $PART == 3 ]; then
+    elif [[ "$line" != "" ]] && [ $PART == 3 ]; then
         paths+=( "$line" )
-    else if [[ "$line" != "" ]] && [ $PART == 4 ]; then
+    elif [[ "$line" != "" ]] && [ $PART == 4 ]; then
         post_cmd+=( "$line" )
-    else if [[ "$line" != "" ]] && [ $PART == 5 ]; then
+    elif [[ "$line" != "" ]] && [ $PART == 5 ]; then
         config+=( "$line" )
-    fi
-    fi
-    fi
-    fi
-    fi
-    fi
     fi
 done < /opt/installitrude/.gertrude_list
 
